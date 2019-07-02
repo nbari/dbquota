@@ -10,6 +10,6 @@ services:
     environment:
       MYSQL_DATABASE: dbquota
       MYSQL_ROOT_PASSWORD: test
-    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
     volumes:
+      - ${PWD}/mariadb/conf.d/:/etc/mysql/conf.d
       - ${PWD}/mariadb/db/:/var/lib/mysql
