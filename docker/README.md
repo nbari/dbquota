@@ -11,3 +11,7 @@ For loading the database with a dummy table:
 
     $ for i in {1..100};
     mycli --port 13306 -uroot -ptest dbquota_$i < test_db.sql &
+
+Create a test user:
+
+    GRANT ALL PRIVILEGES ON dbquota_1.* TO 'monkey'@'%' IDENTIFIED BY 'test';

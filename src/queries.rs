@@ -1,3 +1,4 @@
+use mysql::params;
 use std::{error, fmt};
 
 #[derive(Debug)]
@@ -80,8 +81,19 @@ impl<'a> Queries<'a> {
             .prep_exec("SELECT name FROM quotas WHERE bytes > quota", ())?;
         for row in rows {
             let row = row.map_err(Error::MySQL)?;
-            let row = mysql::from_row_opt::<String>(row)?;
-            println!("db over quota: {}", row);
+            let dbname = mysql::from_row_opt::<String>(row)?;
+            // revoke insert, update on <dbname>.* FROM '<user>'@'%'
+            let users = self
+                .pool
+                .prep_exec("SELECT user FROM mysql.db WHERE Db=?", (&dbname,))?;
+            for user in users {
+                let user = user.map_err(Error::MySQL)?;
+                let user = mysql::from_row_opt::<String>(user)?;
+                self.pool.prep_exec(
+                    "REVOKE INSERT, UPDATE ON :a.* FROM ':b'@'%'",
+                    params! {"a"=>&dbname, "b"=>user},
+                )?;
+            }
         }
         Ok(())
     }
