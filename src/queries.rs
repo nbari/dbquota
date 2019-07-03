@@ -1,6 +1,4 @@
-use rand::Rng;
 use std::{error, fmt};
-use uuid::Uuid;
 
 #[derive(Debug)]
 pub enum Error {
@@ -33,15 +31,15 @@ impl From<mysql::FromRowError> for Error {
     }
 }
 
-pub struct Queries {
-    pool: mysql::Pool,
+pub struct Queries<'a> {
+    pool: &'a mysql::Pool,
 }
 
-pub fn new(pool: mysql::Pool) -> Queries {
+pub fn new(pool: &mysql::Pool) -> Queries {
     return Queries { pool: pool };
 }
 
-impl Queries {
+impl<'a> Queries<'a> {
     pub fn update_db_size(&self) -> Result<(), Error> {
         let pool = &self.pool.clone();
 
@@ -50,7 +48,7 @@ impl Queries {
             r#"CREATE TABLE IF NOT EXISTS quotas (
         name VARCHAR(64) NOT NULL,
         bytes BIGINT UNSIGNED NOT NULL,
-        mbytes DOUBLE UNSIGNED NOT NULL,
+        mbytes FLOAT UNSIGNED NOT NULL,
         quota BIGINT UNSIGNED,
         enabled BIT(1) DEFAULT 0,
         cdate timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -59,7 +57,9 @@ impl Queries {
         )?;
 
         // update table with db size
-        pool.prep_exec(
+        // optimize table <tbname> claims disk space
+        let mut tr = pool.start_transaction(true, None, None)?;
+        tr.prep_exec(
             r#"INSERT INTO quotas (name, bytes, mbytes)
             SELECT t.name, t.bytes, t.mbytes
             FROM
@@ -72,5 +72,7 @@ impl Queries {
             ON DUPLICATE KEY UPDATE bytes=t.bytes, mbytes=t.mbytes"#,
             (),
         )?;
+        tr.commit()?;
+        Ok(())
     }
 }

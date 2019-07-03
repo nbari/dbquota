@@ -13,6 +13,5 @@ license-file = "LICENSE"
 edition = "2018"
 
 [dependencies]
-futures = "0.1.28"
-mysql_async = "0.19.1"
-tokio = "0.1.21"
+clap = "2"
+mysql = "16.0"
