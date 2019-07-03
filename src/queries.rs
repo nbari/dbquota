@@ -41,16 +41,14 @@ pub fn new(pool: &mysql::Pool) -> Queries {
 
 impl<'a> Queries<'a> {
     pub fn update_db_size(&self) -> Result<(), Error> {
-        let pool = &self.pool.clone();
-
         // create table
-        pool.prep_exec(
+        self.pool.prep_exec(
             r#"CREATE TABLE IF NOT EXISTS quotas (
         name VARCHAR(64) NOT NULL,
         bytes BIGINT UNSIGNED NOT NULL,
         mbytes FLOAT UNSIGNED NOT NULL,
         quota BIGINT UNSIGNED,
-        enabled BIT(1) DEFAULT 0,
+        enabled TINYINT(1) DEFAULT 0,
         cdate timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY(name))"#,
             (),
@@ -58,7 +56,7 @@ impl<'a> Queries<'a> {
 
         // update table with db size
         // optimize table <tbname> claims disk space
-        let mut tr = pool.start_transaction(true, None, None)?;
+        let mut tr = self.pool.start_transaction(true, None, None)?;
         tr.prep_exec(
             r#"INSERT INTO quotas (name, bytes, mbytes)
             SELECT t.name, t.bytes, t.mbytes
@@ -73,6 +71,18 @@ impl<'a> Queries<'a> {
             (),
         )?;
         tr.commit()?;
+        Ok(())
+    }
+
+    pub fn enforce_quota(&self) -> Result<(), Error> {
+        let rows = self
+            .pool
+            .prep_exec("SELECT name FROM quotas WHERE bytes > quota", ())?;
+        for row in rows {
+            let row = row.map_err(Error::MySQL)?;
+            let row = mysql::from_row_opt::<String>(row)?;
+            println!("db over quota: {}", row);
+        }
         Ok(())
     }
 }
