@@ -1,6 +1,6 @@
 [package]
 name = "dbquota"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["nbari <nbari@tequila.io>"]
 description = "enforces database quotas by toggling a read-only status"
 documentation = "https://github.com/nbari/dbquota/blob/master/README.md"
