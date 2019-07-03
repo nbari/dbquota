@@ -33,7 +33,7 @@ fn main() {
     });
     let mut opts = mysql::OptsBuilder::from_opts(opts);
     opts.stmt_cache_size(0);
-    let pool = mysql::Pool::new_manual(1, 2, opts).unwrap_or_else(|e| {
+    let pool = mysql::Pool::new_manual(1, 5, opts).unwrap_or_else(|e| {
         eprintln!("Could not connect: {}", e);
         process::exit(1);
     });
