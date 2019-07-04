@@ -141,7 +141,7 @@ dependencies = [
 
 [[package]]
 name = "dbquota"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "mysql 16.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
