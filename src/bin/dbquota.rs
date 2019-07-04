@@ -33,7 +33,7 @@ fn main() {
     });
     let mut opts = mysql::OptsBuilder::from_opts(opts);
     opts.stmt_cache_size(0);
-    let pool = mysql::Pool::new_manual(1, 5, opts).unwrap_or_else(|e| {
+    let pool = mysql::Pool::new_manual(1, 10, opts).unwrap_or_else(|e| {
         eprintln!("Could not connect: {}", e);
         process::exit(1);
     });
@@ -43,12 +43,20 @@ fn main() {
         let wait_time = Duration::from_secs(every);
         let q = queries::new(&pool);
 
+        // populate dbquota
         match q.update_db_size() {
             Err(e) => eprintln!("Error Updating db size: {}", e),
             Ok(_) => {}
         };
 
+        // check for databased that exceeded the quota and revoke privileges
         match q.enforce_quota() {
+            Err(e) => eprintln!("Error enforcing quota: {}", e),
+            Ok(_) => {}
+        };
+
+        // check if database is below the defined quota and grant privileges
+        match q.revoke_quota() {
             Err(e) => eprintln!("Error enforcing quota: {}", e),
             Ok(_) => {}
         };

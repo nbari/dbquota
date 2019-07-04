@@ -1,4 +1,3 @@
-use mysql::params;
 use std::{error, fmt};
 
 #[derive(Debug)]
@@ -51,6 +50,7 @@ impl<'a> Queries<'a> {
         quota BIGINT UNSIGNED,
         enabled TINYINT(1) DEFAULT 0,
         cdate timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        edate timestamp NULL DEFAULT NULL,
         PRIMARY KEY(name))"#,
             (),
         )?;
@@ -76,30 +76,66 @@ impl<'a> Queries<'a> {
     }
 
     pub fn enforce_quota(&self) -> Result<(), Error> {
-        let rows = self
-            .pool
-            .prep_exec("SELECT name FROM quotas WHERE bytes > quota", ())?;
+        let rows = self.pool.prep_exec(
+            "SELECT name FROM quotas WHERE bytes > quota AND enabled=1",
+            (),
+        )?;
         for row in rows {
             let row = row.map_err(Error::MySQL)?;
             let dbname = mysql::from_row_opt::<String>(row)?;
             // revoke insert, update on <dbname>.* FROM '<user>'@'%'
             let users = self
                 .pool
-                .prep_exec("SELECT user FROM mysql.db WHERE Db=?", (&dbname,))?;
+                .prep_exec("SELECT user, host FROM mysql.db WHERE Db=?", (&dbname,))?;
             for user in users {
                 let user = user.map_err(Error::MySQL)?;
-                let user = mysql::from_row_opt::<String>(user)?;
-                self.pool.prep_exec(
-                    "REVOKE INSERT, UPDATE, CREATE, ALTER ON :db.* FROM ':user'@'%'",
-                    params! {"db" => &dbname, "user" => user},
+                let (user, host) = mysql::from_row_opt::<(String, String)>(user)?;
+                let mut tr = self.pool.start_transaction(true, None, None)?;
+                tr.prep_exec(
+                    format!(
+                        "REVOKE INSERT, UPDATE, CREATE, ALTER ON `{}`.* FROM '{}'@'{}'",
+                        &dbname, user, host
+                    ),
+                    (),
                 )?;
-                //self.pool.prep_exec(
-                //format!(
-                //"REVOKE INSERT, UPDATE, CREATE, ALTER ON {}.* FROM '{}'@'%'",
-                //&dbname, user
-                //),
-                //(),
-                //)?;
+                tr.prep_exec(
+                    "UPDATE quotas SET enabled=2, edate=NOW() WHERE name=?",
+                    (&dbname,),
+                )?;
+                tr.commit()?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn revoke_quota(&self) -> Result<(), Error> {
+        let rows = self.pool.prep_exec(
+            "SELECT name FROM quotas WHERE bytes < quota AND enabled <= 2",
+            (),
+        )?;
+        for row in rows {
+            let row = row.map_err(Error::MySQL)?;
+            let dbname = mysql::from_row_opt::<String>(row)?;
+            // revoke insert, update on <dbname>.* FROM '<user>'@'%'
+            let users = self
+                .pool
+                .prep_exec("SELECT user, host FROM mysql.db WHERE Db=?", (&dbname,))?;
+            for user in users {
+                let user = user.map_err(Error::MySQL)?;
+                let (user, host) = mysql::from_row_opt::<(String, String)>(user)?;
+                let mut tr = self.pool.start_transaction(true, None, None)?;
+                tr.prep_exec(
+                    format!(
+                        "GRANT ALL PRIVILEGES ON `{}`.* TO '{}'@'{}'",
+                        &dbname, user, host
+                    ),
+                    (),
+                )?;
+                tr.prep_exec(
+                    "UPDATE quotas SET enabled=1, edate=NOW() WHERE name=?",
+                    (&dbname,),
+                )?;
+                tr.commit()?;
             }
         }
         Ok(())
