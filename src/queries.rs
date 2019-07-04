@@ -110,7 +110,7 @@ impl<'a> Queries<'a> {
 
     pub fn revoke_quota(&self) -> Result<(), Error> {
         let rows = self.pool.prep_exec(
-            "SELECT name FROM quotas WHERE bytes < quota AND enabled <= 2",
+            "SELECT name FROM quotas WHERE bytes < quota AND enabled > 1",
             (),
         )?;
         for row in rows {
