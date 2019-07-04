@@ -15,3 +15,7 @@ For loading the database with a dummy table:
 Create a test user:
 
     GRANT ALL PRIVILEGES ON dbquota_1.* TO 'monkey'@'%' IDENTIFIED BY 'test';
+
+To increase size of table you could use:
+
+    INSERT INTO test(uuid) SELECT UUID() FROM test;

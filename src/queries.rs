@@ -1,3 +1,4 @@
+use mysql::params;
 use std::{error, fmt};
 
 #[derive(Debug)]
@@ -89,12 +90,16 @@ impl<'a> Queries<'a> {
                 let user = user.map_err(Error::MySQL)?;
                 let user = mysql::from_row_opt::<String>(user)?;
                 self.pool.prep_exec(
-                    format!(
-                        "REVOKE INSERT, UPDATE, CREATE, ALTER ON {}.* FROM '{}'@'%'",
-                        &dbname, user
-                    ),
-                    (),
+                    "REVOKE INSERT, UPDATE, CREATE, ALTER ON :db.* FROM ':user'@'%'",
+                    params! {"db" => &dbname, "user" => user},
                 )?;
+                //self.pool.prep_exec(
+                //format!(
+                //"REVOKE INSERT, UPDATE, CREATE, ALTER ON {}.* FROM '{}'@'%'",
+                //&dbname, user
+                //),
+                //(),
+                //)?;
             }
         }
         Ok(())
